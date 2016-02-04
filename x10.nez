@@ -41,7 +41,7 @@ example PackageDeclaration '''
 package ID.ID;
 '''
 example ImportDeclarations '''
-import ID.ID;
+import Int;
 import ID.ID.*;
 '''
 example TypeDeclaration '''
