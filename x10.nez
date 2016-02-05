@@ -11,31 +11,175 @@ LINECOMMENT               = '//' ( ![\r\n] . )*
 W                         = [a-zA-Z_0-9]
 
 /* Declarations */
-PackageDeclaration        = { 'package P;' #Stub }
-ImportDeclarations        = { 'import I;' #Stub }
+PackageDeclaration        = { ( $(Annotations) _ )? "package" _ $(PackageName) #PackageDeclaration }
+PackageName               = Id {$ _ "." _ $(Id) #PackageName }*
+Id                        = Identifier
+IdList                    = { $(Id) ( _ "." _ $(Id) )* #IdList }
+ImportDeclarations        = { $(ImportDeclaration) ( _ $(ImportDeclaration) )* #ImportDeclarations }
+ImportDeclaration         = { $(SingleTypeImportDecln) #ImportDeclaration }
+                          / { $(TypeImportOnDemandDecln) #ImportDeclaration }
+SingleTypeImportDecln     = { "import" _ $(TypeName) _ ";" #SingleTypeImportDecln }
+TypeImportOnDemandDecln   = { "import" _ $(PackageOrTypeName) _ "." _ "*" _ ";" #TypeImportOnDemandDecln }
+PackageOrTypeName         = Id {$ _ "." _ $(Id) #PackageOrTypeName }*
+TypeDeclarations          = { $(TypeDeclaration) ( _ $(TypeDeclaration) )* #TypeDeclaration }
+TypeDeclaration           = { $(ClassDeclaration) #TypeDeclaration}
+                          / { $(StructDeclaration) #TypeDeclaration}
+                          / { $(InterfaceDeclaration) #TypeDeclaration}
+                          / { $(TypeDefDeclaration) #TypeDeclaration}
+                          / { ';' #TypeDefDeclaration }
+ClassDeclaration          = { ( $(Mods) _ )? "class" _ $(Id) ( _ $(TypeParametersI) )? ( _ $(Properties) )? ( _ $(Guard) )? ( _ $(Super) )? ( _ $(Interfaces) )? _ $(ClassBody) #ClassDeclaration }
+StructDeclaration         = { ( $(Mods) _ )? "struct" _ $(Id) ( _ $(TypeParametersI) )? ( _ $(Properties) )? ( _ $(Guard) )? ( _ $(Interfaces) )? _ $(ClassBody) #StructDeclaration }
+InterfaceDeclaration      = { ( $(Mods) _ )? "interface" _ $(Id) ( _ $(TypeParametersI) )? ( _ $(Properties) )? ( _ $(Guard) )? ( _ $(ExtendsInterfaces) )? _ $(InterfaceBody) #InterfaceDeclaration }
+TypeDefDeclaration        = { ( $(Mods) _ )? "type" _ $(Id) ( _ $(TypeParameters) )? ( _ $(Guard) )? _ "=" _ $(Type) #TypeDefDeclaration }
+                          / { ( $(Mods) _ )? "type" _ $(Id) ( _ $(TypeParameters) )? _ "(" _ $(FormalList) _ ")" ( _ $(Guard) )? _ $(Type) #TypeDefDeclaration }
+MethodDeclaration         = { $(MethMods) _ "def" _ $(Id) ( _ $(TypeParameters) )? _ $(Formals) ( _ $(Guard) )? ( _ $(Throws) )? ( _ $(HasResultType) )? _ $(MethodBody) #MethodDeclaration }
+                          / { $(BinOpDeclaration) #MethodDeclaration }
+                          / { $(PrefixOpDeclatation) #MethodDeclaration }
+                          / { $(ApplyOpDeclaration) #MethodDeclaration }
+                          / { $(SetOpDeclaration) #MethodDeclaration }
+                          / { $(ConversionOpDeclaration) #MethodDeclaration }
+BinOpDeclaration          = { $(MethMods) _ "operator" ( _ $(TypeParameters) )? _ "(" _ $(Formal) _ ")" _ $(BinOp) _ "(" _ $(Formal) _ ")" ( _ $(Guard) )? ( _ $(HasResultType) )? _ $(MethodBody) #BinOpDeclaration }
+                          / { $(MethMods) _ "operator" ( _ $(TypeParameters) )? _ "this" _ $(BinOp) _ "(" _ $(Formal) _ ")" ( _ $(Guard) )? ( _ $(HasResultType) )? _ $(MethodBody) #BinOpDeclaration }
+                          / { $(MethMods) _ "operator" ( _ $(TypeParameters) )? _ "(" _ $(Formal) _ ")" _ $(BinOp) _ "this" ( _ $(Guard) )? ( _ $(HasResultType) )? _ $(MethodBody) #BinOpDeclaration }
+PrefixOpDeclatation       = { $(MethMods) _ "operator" ( _ $(TypeParameters) )? _ $(PrefixOp) _ "(" _ $(Formal) _ ")" ( _ $(Guard) )? ( _ $(HasResultType) )? _ $(MethodBody) #PrefixOpDeclatation }
+                          / { $(MethMods) _ "operator" ( _ $(TypeParameters) )? _ $(PrefixOp) _ "this" ( _ $(Guard) )? ( _ $(HasResultType) )? _ $(MethodBody) #PrefixOpDeclatation }
+ApplyOpDeclaration        = { $(MethMods) _ "operator" _ "this" ( _ $(TypeParameters) )? _ $(Formals) ( _ $(Guard) )? ( _ $(HasResultType) )? _ $(MethodBody) #ApplyOpDeclaration }
+SetOpDeclaration          = { $(MethMods) _ "operator" _ "this" ( _ $(TypeParameters) )? _ $(Formals) _ "=" _ "(" _ $(Formal) _ ")" ( _ $(Guard) )? ( _ $(HasResultType) )? _ $(MethodBody) #SetOpDeclaration }
+ConversionOpDeclaration   = { $(ExplConvOpDeclaration) #ConversionOpDeclaration }
+                          / { $(ImprConvOpDeclaration) #ConversionOpDeclaration }
+ExplConvOpDeclaration     = { $(MethMods) _ "operator" ( _ $(TypeParameters) )? _ "(" _ $(Formal) _ ")" _ "as" _ $(Type) ( _ $(Guard) )? ( _ $(HasResultType) )? _ $(MethodBody) #ExplConvOpDeclaration }
+                          / { $(MethMods) _ "operator" ( _ $(TypeParameters) )? _ "(" _ $(Formal) _ ")" _ "as" _ "?" ( _ $(Guard) )? ( _ $(HasResultType) )? _ $(MethodBody) #ExplConvOpDeclaration }
+ImprConvOpDeclaration     = { $(MethMods) _ "operator" ( _ $(TypeParameters) )? _ "(" _ $(Formal) _ ")" ( _ $(Guard) )? ( _ $(HasResultType) )? _ $(MethodBody) #ImprConvOpDeclaration }
+ConstructorDeclaration    = { ( $(Mods) _ )? "def" _ "this" ( _ $(TypeParameters) )? ( _ $(Formals) )? ( _ $(Guard) )? ( _ $(HasResultType) )? _ $(ConstructorBody) #ConstructorDeclaration }
+PropertyMethodDeclaration = { $(MethMods) _ $(Id) ( _ $(TypeParameters) )? _ $(Formals) ( _ $(Guard) )? ( _ $(HasResultType) )? _ $(MethodBody) #PropertyMethodDeclaration }
+                          / { $(MethMods) _ $(Id) ( _ $(Guard) )? ( _ $(HasResultType) )? _ $(MethodBody) #PropertyMethodDeclaration }
+FieldDeclaration          = { ( $(Mods) _ )? $(VarKeyword) _ $(FieldDeclrs) _ ";" #FieldDeclaration }
+                          / { ( $(Mods) _ )? $(FieldDeclrs) _ ";" #FieldDeclaration }
+FieldDeclrs               = { $(FieldDeclr) ( _ "," _ $(FieldDeclr) )* #FieldDeclrs }
+FieldDeclr                = { $(Id) ( _ $(HasResultType) )? _ "=" _ $(VariableInitializer) #FieldDeclr }
+                          / { $(Id) _ $(HasResultType) #FieldDeclr }
 
-PackageName               = { 'P' #Stub }
-PackageOrTypeName         = { 'P' #Stub }
-
-TypeDeclarations          = { 'class X{}' #Stub }
-ClassDeclaration          = { 'class X{}' #Stub }
-ClassBody                 = { '{}' #Stub }
-StructDeclaration         = { 'struct X{}' #Stub }
-InterfaceDeclaration      = { 'interface X{}' #Stub }
-TypeDefDeclaration        = { 'type ID = int;' #Stub }
-
-MethodDeclaration         = { 'def x() {}' #Stub }
-ConstructorDeclaration    = { 'def this() {}' #Stub }
-PropertyMethodDeclaration = { 'x() {}' #Stub }
-
-FieldDeclaration          = { 'x:Int;' #Stub }
-LocalVariableDeclaration  = { 'var x = 1' #Stub }
-Formals                   = { '(ID : Int)' #Stub }
-Formal                    = { 'ID : Int' #Stub }
-LoopIndex                 = { 'li' #Stub }
-
-Guard                     = { '{exp}' #Stub }
-HasResultType             = { '<: Int' #Stub }
+VariableInitializer       = { $(Expression) #VariableInitializer }
+LocalVariableDeclaration  = { ( $(Mods) _ )? $(VarKeyword) _ $(VariableDeclarations) #LocalVariableDeclaration }
+                          / { ( $(Mods) _ )? _ $(VariableDeclarationsWType) #LocalVariableDeclaration }
+                          / { ( $(Mods) _ )? $(VarKeyword) _ $(FormalDeclarations) #LocalVariableDeclaration }
+VariableDeclarations      = { $(VariableDeclaration) ( _ "," _ $(VariableDeclaration) )* #VariableDeclarations }
+VariableDeclaration       = { $(Id) ( _ $(HasResultType) )? _ "=" _ $(VariableInitializer) #VariableDeclaration }
+                          / { "[" _ $(IdList) _ "]" ( _ $(HasResultType) )? _ "=" _ $(VariableInitializer) #VariableDeclaration }
+                          / { $(Id) _ "[" _ $(IdList) _ "]" ( _ $(HasResultType) )? _ "=" _ $(VariableInitializer) #VariableDeclaration }
+VariableDeclarationsWType = { $(VariableDeclarationWType) ( _ "," _ $(VariableDeclarationWType) )* #VariableDeclarationsWType }
+VariableDeclarationWType  = { $(Id) _ $(HasResultType) _ "=" _ $(VariableInitializer) #VariableDeclaration }
+                          / { "[" _ $(IdList) _ "]" _ $(HasResultType) _ "=" _ $(VariableInitializer) #VariableDeclaration }
+                          / { $(Id) _ "[" _ $(IdList) _ "]" _ $(HasResultType) _ "=" _ $(VariableInitializer) #VariableDeclaration }
+FormalDeclarations        = { $(FormalDeclaration) ( _ "," _ $(FormalDeclaration) )* #FormalDeclarations }
+FormalDeclaration         = { $(Id) _ $(ResultType) #FormalDeclaration }
+                          / { "[" _ $(IdList) _ "]" _ $(ResultType) #FormalDeclaration }
+                          / { $(Id) _ "[" _ $(IdList) _ "]" _ $(ResultType) #FormalDeclaration }
+LoopIndex                 = { ( $(Mods) _ )? $(LoopIndexDeclaration) #LoopIndex }
+                          / { ( $(Mods) _ )? $(VarKeyword) _ $(LoopIndexDeclaration) #LoopIndex }
+LoopIndexDeclaration      = { $(Id) ( _ $(HasResultType) )? #LoopIndexDeclaration }
+                          / { "[" _ $(IdList) _ "]" ( _ $(HasResultType) )? #LoopIndexDeclaration }
+                          / { $(Id) _ "[" _ $(IdList) _ "]" ( _ $(HasResultType) )? #LoopIndexDeclaration }
+Mods                      = { $(Mod) ( _ $(Mod) )* #Mods }
+Mod                       = Annotation
+                          / "abstract" { #Abstract }
+                          / "atomic" { #Atomic }
+                          / "final" { #Final }
+                          / "native" { #Native }
+                          / "private" { #Private }
+                          / "protected" { #Protected }
+                          / "public" { #Public }
+                          / "static" { #Static }
+                          / "transient" { #Transient }
+                          / "clocked" { #Clocked }
+MethMods                  = ( Mods / "property" { #Property } / Mod ) {$ _ ( "property" / $(Mod) ) #MethMods }*
+Properties                = { "(" _ $(PropList) _ ")" #Properties }
+PropList                  = { $(Prop) ( _ "," _ $(Prop) )* #PropList }
+Prop                      = { ( $(Annotations) _ )? $(Id) _ $(ResultType) #Prop }
+ResultType                = { ":" _ $(Type) #ResultType }
+Super                     = { "extends" _ $(ClassType) #Super }
+Interfaces                = { "implements" _ $(InterfaceTypeList) #Interfaces }
+ClassBody                 = { "{" ( _ $(ClassMemberDeclaration) )? _ "}"}
+ClassMemberDeclaration    = { $(InterfaceMemberDecln) #ClassMemberDeclaration }
+                          / { $(ConstructorDeclaration) #ClassMemberDeclaration }
+ConstructorBody           = { $(ConstructorBlock) #ConstructorBody }
+                          / { "=" _ $(ExplicitCtorInvo) #ConstructorBody }
+                          / { "=" _ $(AssignPropCall) #ConstructorBody }
+                          / ";" { #ConstructorBody }
+ConstructorBlock          = { "{" ( _ $(ExplicitCtorInvo) )? ( _ _BlockStatements )? _ "}" #ConstructorBlock }
+ExplicitCtorInvo          = { "this" ( _ $(TypeArguments) )? _ "(" ( _ $(ArgumentList) )? _ ")" _ ";" #ExplicitCtorInvo }
+                          / { "super" ( _ $(TypeArguments) )? _ "(" ( _ $(ArgumentList) )? _ ")" _ ";" #ExplicitCtorInvo }
+                          / { $(PrimaryExpression) _ "." _ "this" ( _ $(TypeArguments) )? _ "(" ( _ $(ArgumentList) )? _ ")" _ ";" #ExplicitCtorInvo }
+                          / { $(PrimaryExpression) _ "." _ "super" ( _ $(TypeArguments) )? _ "(" ( _ $(ArgumentList) )? _ ")" _ ";" #ExplicitCtorInvo }
+AssignPropCall            = { "property" ( _ $(TypeArguments) )? _ "(" ( _ $(ArgumentList) )? _ ")" _ ";" #AssignPropCall }
+ExtendsInterfaces         = "extends" _ Type {$ _ "," _ $(Type) #ExtendsInterfaces }
+InterfaceBody             = { "{" ( _ $(InterfaceMemberDeclns) )? _ "}" #InterfaceBody }
+InterfaceMemberDeclns     = { $(InterfaceMemberDecln) ( _ $(InterfaceMemberDecln) )* #InterfaceMemberDeclns }
+InterfaceMemberDecln      = { $(MethodDeclaration) #InterfaceMemberDecln }
+                          / { $(PropertyMethodDeclaration) #InterfaceMemberDecln }
+                          / { $(FieldDeclaration) #InterfaceMemberDecln }
+                          / { $(TypeDeclaration) #InterfaceMemberDecln }
+FormalList                = { $(Formal) ( _ "," _ $(Formal) )* #FormalList }
+Formals                   = { "(" ( _ $(FormalList) )? _ ")" #Formals }
+Formal                    = { ( $(Mods) _ )? $(FormalDeclaration) #Formal }
+                          / { ( $(Mods) _ )? $(VarKeyword) _ $(FormalDeclaration) #Formal }
+                          / { $(Type) #Formal }
+VarKeyword                = "val" { #Val }
+                          / "var" { #Var }
+FormalDeclaration         = { $(Id) _ $(ResultType) #FormalDeclaration }
+                          / { "[" _ $(IdList) _ "]" _ $(ResultType) #FormalDeclaration }
+                          / { $(Id) _ "[" _ $(IdList) _ "]" _ $(ResultType) #FormalDeclaration }
+Guard                     = { $(DepParams) #Guard }
+Throws                    = { "throws" _ $(ThrowList) #Throws }
+ThrowList                 = { $(Type) ( _ "," _ $(Type) )? #ThrowList }
+HasResultType             = { $(ResultType) #HasResultType }
+                          / { "<:" _ $(Type) #HasResultType }
+MethodBody                = { "=" _ $(LastExp) _ ";" #MethodBody }
+                          / { ( $(Annotations) _ )? $(Block) #MethodBody }
+                          / { ";" #MethodBody }
+LastExp                   = { $(Expression) #LastExp }
+BinOp                     = { (
+                          "+"
+                          / "-"
+                          / "*"
+                          / "/"
+                          / "%"
+                          / "&"
+                          / "|"
+                          / "^"
+                          / "&&"
+                          / "||"
+                          / "<<"
+                          / ">>"
+                          / ">>>"
+                          / ">="
+                          / "<="
+                          / ">"
+                          / "<"
+                          / "=="
+                          / "!="
+                          / ".."
+                          / "->"
+                          / "<-"
+                          / "-<"
+                          / ">-"
+                          / "**"
+                          / "~"
+                          / "!~"
+                          / "!"
+                          ) #BinOp }
+PrefixOp                  = { (
+                          "+"
+                          / "-"
+                          / "!"
+                          / "~"
+                          / "^"
+                          / "|"
+                          / "&"
+                          / "*"
+                          / "/"
+                          / "%"
+                          ) #PrefixOp }
 
 example PackageDeclaration '''
 package ID.ID;
@@ -86,23 +230,62 @@ var ID : Int
 
 
 /* Types */
-Type                      = { 'Int' #Stub }
-NamedType                 = { 'Int' #Stub }
+Type                      = { ( $(FunctionType) / $(NamedType) / $(Void) ) $(Annotations)* #Type }
 
-DepParams                 = { '{exp}' #Stub }
+FunctionType              = { $(TypeParameters)? _ $(Formals) _ $(Guard)? _ '=>' _ $(Type) _ #FunctionType }
 
-ClassType                 = { 'Int' #Stub }
-InterfaceTypeList         = { 'Int, Int' #Stub }
-ThrowsList                = { 'Int, Int' #Stub }
+DepParams                 = '{' _ Expression _ '}'
 
-TypeName                  = { 'Int' #Stub }
+Annotation                = { '@' $(NamedTypeNoConstraints) #Annotation }
 
-Annotations               = { '@A' #Stub }
-Annotation                = { '@A' #Stub }
+//ConstrainedType           = NamedType / AnnotatedType
 
-TypeArguments             = { '[Int,Int]' #Stub }
-TypeParameters            = { '[ID,ID]' #Stub }
-TypeParametersI           = { '[ID,]' #Stub }
+Void                      = { 'void' #Void }
+
+Annotations               = { $(Annotation)+ }
+
+ClassType                 = NamedType
+
+ThrowsList                = { Type _ ( ',' _ Type )* #ThrowsList }
+
+InterfaceTypeList         = { Type _ ( ',' _ Type )* #InterfaceTypeList }
+
+
+//AnnotatedType             = { $(Type) $(Annotations) #AnnotatedType }
+
+TypeArguments             = { '[' $(TypeArgumentList) ' ]' #TypeArguments }
+
+TypeArgumentList          = { $(Type) ( ',' $(Type) )* }
+
+TypeParameters            = { '[' $(TypeParamList) ']' #TypeParameters }
+TypeParametersI           = { '[' $(TypeParamIList) ']' #TypeParametersI }
+
+TypeParamIList            =　{ $(TypeParam) _ ( ',' _ $(TypeParam) )* _ ','? }
+
+TypeParamList             = { $(TypeParam) _ ( ',' _ $(TypeParam) )* }
+
+TypeParam                 = { $(Id) #TypeParam }
+
+TypeName                  = { $(Id) ( '.' $(Id) )* #TypeName }
+
+NamedType                 = { $(NamedTypeNoConstraints ) }
+			  / DepNamedType
+
+NamedTypeNoConstraints    = { $(ParamizedNamedType) }
+			  / { $(SimpleNamedType) }
+
+SimpleNamedType           = { $(TypeName) }
+			  / { $(PrimaryExpression) '.' $(Id) }
+			  / { $(ParamizedNamedType) '.' $(Id) }
+			  / { $(DepNamedType) '.' $(Id) }
+
+ParamizedNamedType        = { $(TypeName) $(TypeParameters) }
+
+			  
+DepNamedType              = { ( $(TypeName) / $(PrimaryExpression) '.' $(Id) / $(ParamizedNamedType) '.' $(Id) ) ( '.' $(Id) $(DepParams) )* }
+			  / { $(ParamizedNamedType) $(DepParams) }
+
+
 
 example Type Int
 example Type ID[ID]
@@ -112,11 +295,105 @@ example Type (ID : Int) => Int
 
 
 /* Statements */
-Block                     = { '{}' #Stub }
-_BlockStatements          = #Stub
-LocalVariableDeclarationStatement = { 'var x = 1;' #Stub }
+_BlockStatements          = _ ($(BlockInteriorStatement) _ ( _ $(BlockInteriorStatement))* ) _
 
-Statement                 = { 'stmt' #Stub }
+Block                     = { "{" _ $(BlockStatements)?  "}" _ #Block }
+BlockStatements                = { _ ($(BlockInteriorStatement) _ ( _ $(BlockInteriorStatement))* ) _ #BlockStatements}
+BlockInteriorStatement    = LocalVariableDeclarationStatement
+                          / ClassDeclaration
+                          / StructDeclaration
+                          / TypeDefDeclaration
+                          / Statement
+
+Statement                 = Block
+                          / EmptyStatement
+                          / LocalVariableDeclarationStatement
+                          / ExpressionStatement
+                          / LabeledStatement
+                          / BreakStatement
+                          / ContinueStatement
+                          / IfThenStatement
+                          / IfThenElseStatement
+                          / SwitchStatement
+                          / WhileStatement
+                          / DoStatement
+                          / ForStatement
+                          / ReturnStatement
+                          / AssertStatement
+                          / ThrowStatement
+                          / TryStatement
+                          / AsyncStatement
+                          / FinishStatement
+                          / AtEachStatement
+                          / AtStatement
+                          / AtomicStatement
+                          / WhenStatement
+
+EmptyStatement =  {";" #EmptyStatement}
+
+LocalVariableDeclarationStatement = { $(LocalVariableDeclaration) _ ";" _ #LocalVariableDeclarationStatement}
+
+ExpressionStatement = StatementExpression
+
+LabeledStatement = {$(Identifier) _ ':' _ $(Statement) #LabeledStatement}
+
+BreakStatement = {"break" _ $(Identifier)? _ #BreakStatement}
+
+ContinueStatement = {"continue" _ $(Identifier)? #ContinueStatement}
+
+IfThenStatement = {"if" _ "(" _ $(Expression) _ ")" _ $(Statement) #IfThenStatement}
+IfThenElseStatement = {"if" _ "(" _ $(Expression) _ ")" _ $(Statement) _ "else" _ $(Statement) #IfThenElseStatement}
+
+SwitchStatement = {"switch" _ "(" _ $(Expression) _ ")" _ $(SwitchBlock) _ #SwitchStmt}
+SwitchBlock = {"{" _ $(SwitchBlockGroups)? _ $(SwitchLabels)? _ "}" _ #SwitchBlock}
+SwitchBlockGroups = { $(SwitchBlockGroup) _ (_ $(SwitchBlockGroup) _ )* _ #SwitchBlockGroups}
+SwitchBlockGroup = {$(SwitchLabels) _ $(BlockStatements) _ #SwitchBlockGroup}
+SwitchLabels = { $(SwitchLabel) _ (_ $(SwitchLabel) _)* _ #SwitchLabels}
+SwitchLabel = {(_ "case" _ $(ConstantExpression) _ ":" _)
+             / (_ "default" _ ":" _) #SwitchLabel}
+ConstantExpression = Expression
+
+WhileStatement = {"while" _ "(" _ $(Expression) _ ")" _ $(Statement) #WhileStatement}
+
+
+DoStatement = {"do" _ $(Statement) _ "while" _ "(" _ $(Expression) _ ")" #DoStatement}
+
+ForStatement = BasicForStatement
+        / EnhancedForStatement
+BasicForStatement = {"for" _ "(" _ $(ForInit)? _ ";" _ $(Expression)? _ ";" _ $(ForUpdate)? _ ")" _ $(Statement) #BasicForStatement}
+ForInit = StatementExpressionList
+        / LocalVariableDeclaration
+ForUpdate = StatementExpressionList
+EnhancedForStatement = {("for" _ "(" _ $(LoopIndex) _ "in" _ $(Expression) _ ")" _ $(Statement))
+                / ("for" _ "(" _ $(Expression) _ ")" _ $(Statement)) #EnhancedForStatement}
+
+ReturnStatement = {"return" _ $(Expression)? #ReturnStatement}
+
+
+AssertStatement = {("assert" _ $(Expression)) _ (":" _ $(Expression))? #AssertStatement}
+
+ThrowStatement = {"throw" _ $(Expression) #ThrowStatement}
+
+TryStatement = {("try" _ $(Block) _ $(Catches) _ )
+        / ("try" _ $(Block) _ $(Catches)? _ $(Finally)) #TryStmt}
+Catches = { _ $(CatchClause)  _ ( _ $(CatchClause))* _ #Catches}
+CatchClause = { _ "catch" _ "(" _ $(Formal) _ ")" _ $(Block) _ #CatchClause}
+Finally = { _ "finally" _ $(Block) #Finally}
+
+AsyncStatement = {("async" _ $(ClockedClause)? _ $(Statement))
+          / ("clocked" _ "async" _ $(Statement)) #AsyncStmt}
+ClockedClause = {"clocked" _ $(Arguments) _  #ClockedClause}
+
+FinishStatement = {("finish" _ $(Statement))
+            / ("clocked" _ "finish" _ $(Statement)) #FinishStmt}
+
+AtEachStatement = {("ateach" _ "(" _ $(LoopIndex) _ "in" _ $(Expression) _ ")" _ $(ClockedClause)? _ $(Statement))
+            / ("ateach" _ "(" _ $(Expression) _ ")" _ $(Statement)) #AtEachStmt}
+
+AtStatement = { "at" _ "(" _ $(Expression) _  ")" _ $(Statement) #AtStatement}
+
+AtomicStatement = {"atomic" _ $(Statement) #AtomicStmt}
+WhenStatement = {"when" _ "(" _ $(Expression) _ ")" _ $(Statement) #WhenStmt}
 
 example Block {}
 example Block '''
@@ -171,16 +448,81 @@ example Statement when(exp) {}
 
 
 /* Expressions */
-Arguments                 = { '(exp)' #Stub }
-ArgumentList              = { 'exp' #Stub }
-Expression                = { 'exp' #Stub }
+Arguments                 = { "(" (_ ArgumentList)? _ ")" #Arguments }
 
-//ClosureExpression
-PrimaryExpression         = { 'exp' #Stub }
-//array constructor is here
-
-StatementExpressionList   = { 'exp++' #Stub }
-StatementExpression       = { 'exp++' #Stub }
+StatementExpressionList   = { $(StatementExpression)  (_ "," _ $(StatementExpression))* #StatementExpressionList }
+StatementExpression       = Assignment
+                          / UnaryExpression
+Expression                = Assignment
+                          / {Type _ ("<:" #Subtyping / ":>" #Subtyped) Type}
+ArgumentList              = { $(Expression) (_ "," _ $(Expression))* #List}
+Assignment                = {($left(PrimaryExpression / Identifier) _ "(" _ $(ArgumentList)? _ ")" / $left(LeftHandSide)) _ AsstOp _ $right(Expression)}
+                          / ConstantExpression
+LeftHandSide              = FieldAccess / Identifier
+AsstOp                    = "=" #Assign
+                          / "*=" #AssignMul
+                          / "/=" #AssignDiv
+                          / "%=" #AssignMod
+                          / "+=" #AssignAdd
+                          / "-=" #AssignSub
+                          / "<<=" #AssignLeftShift
+                          / ">>=" #AssignRightShift
+                          / ">>>=" #AssignLogicalRightShift
+                          / "&=" #AssignBitwiseAnd
+                          / "^=" #AssignBitwiseXOr
+                          / "|=" #AssignBitwiseXOr
+ConstantExpression        = ConditionalExpression
+ConditionalExpression     = LogicalOrExpression {$cond _ "?" _ $then(Expression) _ ":" _ $else(LogicalOrExpression) #Conditional }*
+LogicalOrExpression       = LogicalAndExpression {$left _ "||" _ $right(LogicalAndExpression) #Or }*
+LogicalAndExpression      = EqualityExpression {$left _ "&&" _ $right(EqualityExpression) #And }*
+EqualityExpression        = RelationalExpression {$left _ ("==" #Equals / "!=" #NotEquals) _ $right(RelationalExpression) }*
+                          / Type {$left _ ("==" #Equals / "!=" #NotEquals) _ $right(Type) }*
+relationalOperator        = "<=" #LessThanEquals
+                          / ">=" #GreaterThanEquals
+                          / "<" #LessThan
+                          / ">" #GreaterThan
+RelationalExpression      = BitwiseOrExpression {$left _ relationalOperator _ $right(BitwiseOrExpression) / _ "instanceof" _ $right(Type) #InstanceOf }*
+BitwiseOrExpression       = BitwiseAndExpression {$left _ "|" _ $right(BitwiseAndExpression) #BitwiseOr }*
+BitwiseAndExpression      = BitwiseXOrExpression {$left _ "&" _ $right(BitwiseXOrExpression) #BitwiseAnd }*
+BitwiseXOrExpression      = ShiftExpression {$left _ "^" _ $right(ShiftExpression) #BitwiseXOr }*
+ShiftExpression           = AdditiveExpression {$left _ ("<<" #LeftShift / ">>" #ArithmeticRightShift / ">>>" #LogicalRightShift) _ $right(AdditiveExpression) }*
+AdditiveExpression        = MultiplicativeExpression {$left _ ("+" #Add / "-" #Sub) _ $right(MultiplicativeExpression) }*
+MultiplicativeExpression  = CastNewExpression {$left _ ("*" #Mul / "/" #Div / "%" #Mod) _ $right(CastNewExpression) }*
+CastNewExpression         = NumericOperation / UnaryExpression
+NumericOperation          = { $(Identifier / Literal) _ "as" _ $(Type) #As}
+UnaryExpression           = PostfixExpression
+                          / { "++" $expr(UnaryExpression) #PreInc }
+                          / { "--" $expr(UnaryExpression) #PreDec }
+                          / { "+" $expr(CastNewExpression) #Plus }
+                          / { "-" $expr(CastNewExpression) #Minus }
+                          / { "~" $expr(CastNewExpression) #BitwiseComplement }
+                          / { "!" $expr(CastNewExpression) #LogicalNot }
+                          / { "new" _ ($name(Identifier) / $type(Type)) $(_ TypeArguments)? _ $({ "(" _ (ArgumentList _)? ")" #List }) $(_ ClassBody)? #New}
+                          / { "at" "(" $expr(Expression) ")" _ $(Identifier) #At }
+PostfixExpression         = PrimaryExpression {$ addMethodInvo / addInstanceCreation / addFieldAccess / addInc / addDec}*
+PrimaryExpression         = { ("this" / $(ClassName) "." "this") #This }
+                          / {"super" #Super}
+                          / "(" _ Expression _ ")"
+                          / {"["_ (addArgumentExpressionList _ )? "]" #Array}
+                          / ClosureExp
+                          / Identifier
+                          / Literal
+addInc                    = "++" #Inc
+addDec                    = "--" #Dec
+addMethodInvo             = "." $(Identifier) _ $(TypeArguments _)? $({ "(" _ (addArgumentExpressionList _)? ")" #List }) #Calls
+addFieldAccess            = "." $(Identifier) !'(' #Field
+addInstanceCreation       = "." "new" _ $(Identifier) $(_ TypeArguments)? _ $({ "(" _ (addArgumentExpressionList _)? ")" #List }) $(_ ClassBody)? #InstanceCreation
+addArgumentExpressionList = $(Expression) (_ "," _ $(Expression) )*
+FieldAccess               = { (
+                            $(PrimaryExpression) "." $(Identifier)
+                          / $({ "super" #Super}) "." $(Identifier)
+                          / $(ClassName) "." $({ "super" #Super}) $(Identifier)
+                          ) #FieldAccess }
+ClassName                 = Identifier
+MethodName                = {$(FullyQualifiedName) "." $(Identifier) #Field} / Identifier
+ClosureExp                = { $(Formals) _ $(Guard)? _ $(HasResultType)? _ "=>" _ ClosureBody #Closure}
+ClosureBody               = $(Expression)
+                          / $(Annotations)? _ $(Block)
 
 example Expression ID
 example Expression 1
@@ -223,8 +565,11 @@ example Expression at(this) ID
 
 /* Identifiers */
 IdentifierList            = { 'ID' #Stub }
-Identifier                = { 'ID' #Stub }
-FullyQualifiedName        = { 'ID' #Stub }
+
+Identifier                = {  '`' $(AnyString) '`' / !$(KEYWORD) $(FullyQualifiedName)  #Identifier }
+AnyString                 = { ( '\\' ( '\\' / '`' ) / !'`' . )* #AnyString }
+
+FullyQualifiedName        = { [a-zA-Z_][a-zA-Z_0-9]* #FullyQualifiedName }
 
 example Identifier Hoge_piyo
 example Identifier Fuga1
@@ -239,7 +584,90 @@ example Identifier '''
 
 
 /* Literals */
-Literal                   = { '1' #Stub }
+Literal = boolean
+        / self
+        / Int
+        / UInt
+        / UShort
+        / UByte
+        / ULong
+        / Short
+        / Byte
+        / Float
+        / Long
+        / Double
+        / String
+        / Char
+
+boolean = {'true' #boolean}
+        / {'false' #boolean}
+
+d = '0'
+  / [1-9][0-9]*
+
+d8 = '0'
+   / [1-7][0-7]*
+
+d16 = '0'
+    / [1-9A-Fa-f][0-9A-Fa-f]*
+
+i = '0' d8
+  / '0' ('x' / 'X') d16
+  / d
+
+s = '+' / '-'
+b = d '.' d
+  / d '.'
+  / d
+  / '.' d
+
+x = ('e' / 'E') s d
+
+f = b x?
+
+self = {'null' #null}
+
+Int = { s? i ('n' / 'N') #Int}
+
+Long = { s? i ('l'/'L') #Long}
+     / { s? i !('.' / 'e') #Long}
+
+UInt = { i ('un' / 'nu' / 'UN' / 'NU') #UInt}
+
+ULong = { i ('u' / 'ul' / 'lu' / 'U' / 'UL' / 'LU') #ULong}
+
+Short = { s? i ('s' / 'S') #Short}
+
+UShort = { i ('us' / 'su' / 'SU' / 'US') #UShort}
+
+Byte = { s? i ('y' / 'Y') #Byte}
+
+UByte = { i ('uy' / 'yu' / 'UY' / 'YU') #UByte}
+
+Float = { s? f ('f' / 'F') #Float}
+
+Double = { s? f ('d' / 'D') #Double}
+       / { s? f 'e' s? d #Double}
+       / { s? f #Double}
+
+
+Char = { ['] CharacterContents ['] #Char }
+
+CharacterContents = !['"\\].
+                  / '\\' 'b'
+                  / '\\' 't'
+                  / '\\' 'n'
+                  / '\\' 'f'
+                  / '\\' 'r'
+                  / '\\' [']
+                  / '\\' '"'
+                  / '\\' '\\'
+                  / '\\' dd
+
+dd = '0' [0-3]* [0-7]* [0-7]*
+
+
+String = { '"' CharacterContents* '"' #String}
 
 example Literal true
 example Literal false
