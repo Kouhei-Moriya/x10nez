@@ -1,6 +1,6 @@
 /* Toplevel */
-File                      = CompilationUnit
-CompilationUnit           = { $(PackageDeclaration)? $(ImportDeclarations)? $(PackageDeclaration)? $(ImportDeclarations)? $(TypeDeclarations)? #Source }
+File                      = _ CompilationUnit !.
+CompilationUnit           = { $(PackageDeclaration)? _ $(ImportDeclarations)? _ $(PackageDeclaration)? _ $(ImportDeclarations)? _ $(TypeDeclarations)? _ #Source }
 
 
 /* Code layout */
@@ -842,4 +842,107 @@ KEYWORD                   = "abstract" / "as" / "assert" / "async" / "at"
 "-<"                      = '-<'
 ">-"                      = '>-'
 "<-"                      = '<-'
+
+/* Integration Tests */
+example File '''
+package examples;
+
+public class AsyncScope {
+  public static def main(Rail[String]) {
+    val val1 = 1;
+    var var1:Int = 2;
+    finish {
+      val val2 = 3;
+      var var2:Int = 4;
+      async {
+        val tmp1 = val1;  // ok
+        val tmp2 = val2;  // ok
+        val tmp3 = var1;  // ok
+//        val tmp4 = var2;  // illegal
+      }
+      async {
+        var1 = 5;         // ok
+//        var2 = 6;         // illegal
+      }
+    }
+  }
+}
+'''
+example File '''
+package examples;
+
+public class Clocks {
+  public static def main(Rail[String]) {
+    clocked finish { // anonymous clock
+      for(1..4) clocked async {
+        Console.OUT.println("Phase 1");
+        Clock.advanceAll();
+        Console.OUT.println("Phase 2");
+      }
+    }
+
+    finish { // named clock
+      val c = Clock.make();
+      for(1..4) async clocked(c) {
+        Console.OUT.println("Phase 3");
+        c.advance();
+        Console.OUT.println("Phase 4");
+      }
+      c.drop();
+    }
+  }
+}
+'''
+example File '''
+package examples;
+
+public class Fib {
+  static def fib(n:Int):Int {
+    if(n < 2) return n;
+    val f1:Int;
+    val f2:Int;
+    finish {
+      async f1 = fib(n-1);
+      f2 = fib(n-2);
+    }
+    return f1 + f2;
+  }
+
+  public static def main(Rail[String]) {
+    Console.OUT.println("fib(20)=" + fib(20));
+  }
+}
+'''
+example File '''
+package examples;
+import x10.io.Console;
+
+public class Hello {                             // class
+  protected val n:Long;                          // field
+
+  public def this(n:Long) { this.n = n; }        // constructor
+
+  public def test() = n > 0;                     // method
+
+  public static def main(args:Rail[String]) {
+    Console.OUT.println("Hello world! ");
+    val foo = new Hello(args.size);              // inferred type
+    var result:Boolean = foo.test();             // no inference for vars
+    if(result) Console.OUT.println("The first arg is: " + args(0));
+  }
+}
+'''
+example File '''
+package examples;
+
+class HelloWholeWorld {
+  public static def main(args:Rail[String]) {
+    finish
+    for(p in Place.places())
+      at(p) async
+        Console.OUT.println(p + " says " + args(0));
+    Console.OUT.println("Bye");
+  }
+}
+'''
 
